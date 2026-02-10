@@ -1,0 +1,53 @@
+{
+  "name": "atm",
+  "version": "1.0.0",
+  "description": "ATM (AI Token Manager CLI) - A command-line tool for AI developers to centrally manage and quickly switch between multi-vendor AI Tokens and API URLs",
+  "main": "src/index.js",
+  "bin": {
+    "atm": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "npm run test:functional && npm run test:security",
+    "test:functional": "node test/functional.test.js",
+    "test:security": "node test/security.test.js",
+    "build": "node scripts/build.js",
+    "clean": "rm -rf dist *.tar.gz",
+    "prepublishOnly": "npm run test && npm run build"
+  },
+  "keywords": [
+    "atm",
+    "ai-token-manager",
+    "token-manager",
+    "ai",
+    "model",
+    "cli",
+    "anthropic",
+    "openai",
+    "configuration"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "preferGlobal": true,
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "homepage": ""
+}
