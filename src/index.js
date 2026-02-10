@@ -592,6 +592,28 @@ function updateCurrentFile(model) {
   }
 }
 
+function installToShellProfile() {
+  const shellConfig = getShellConfigPath();
+  const sourceLine = `source ${CURRENT_FILE}`;
+
+  try {
+    // Check if already installed
+    if (fs.existsSync(shellConfig)) {
+      const content = fs.readFileSync(shellConfig, 'utf-8');
+      if (content.includes(sourceLine)) {
+        return { success: true, alreadyInstalled: true, shellConfig };
+      }
+    }
+
+    // Append to shell config
+    const lineToAdd = `\n# ATM (AI Token Manager CLI)\n${sourceLine}\n`;
+    fs.appendFileSync(shellConfig, lineToAdd);
+    return { success: true, alreadyInstalled: false, shellConfig };
+  } catch (error) {
+    return { success: false, error: error.message, shellConfig };
+  }
+}
+
 // ============================================
 // Feature Modules
 // ============================================
@@ -798,16 +820,15 @@ async function switchModel() {
         printInfo(`Model: ${model.model}`);
 
         console.log('');
-        printSection('Activation Command');
+        printSection('Activation');
+        console.log('');
+        printInfo('Run this command in your terminal to apply immediately:');
         console.log(getActivateCommand());
+        console.log('');
+        printInfo('To make it permanent, run this command:');
+        console.log(style(`  atm install`, 'cyan'));
 
-        if (!IS_WINDOWS) {
-          console.log('');
-          printInfo('To make permanent, add to your shell profile:');
-          console.log(style(`  echo 'source ${CURRENT_FILE}' >> ${getShellConfigPath()}`, 'dim'));
-        }
-
-        resolve();
+        resolve({ model, needsInstall: true });
         return;
       }
 
@@ -928,6 +949,30 @@ async function rescanModels() {
 // ============================================
 // 主菜单
 // ============================================
+async function showInstallStatus() {
+  printSection('Install to Shell Profile');
+
+  const result = installToShellProfile();
+
+  if (result.success) {
+    if (result.alreadyInstalled) {
+      printInfo(`ATM is already installed in ${result.shellConfig}`);
+    } else {
+      printSuccess(`Installed to ${result.shellConfig}`);
+      console.log('');
+      printInfo('Please restart your terminal or run:');
+      console.log(style(`  source ${result.shellConfig}`, 'cyan'));
+      console.log('');
+      printInfo('After restart, your active model will be automatically loaded');
+    }
+  } else {
+    printError(`Failed to install: ${result.error}`);
+    console.log('');
+    printInfo('You can manually add this line to your shell profile:');
+    console.log(style(`  source ${CURRENT_FILE}`, 'dim'));
+  }
+}
+
 async function showMainMenu() {
   printDivider();
   console.log('');
@@ -938,6 +983,7 @@ async function showMainMenu() {
   printMenuItem('5', 'Environment', 'View current environment variables');
   printMenuItem('6', 'Initialize', 'Create configuration directory');
   printMenuItem('7', 'Rescan', 'Rescan local environment for models');
+  printMenuItem('8', 'Install', 'Install to shell profile for persistence');
   printMenuItem('0', 'Exit', 'Quit TMC');
   console.log('');
   printDivider();
@@ -989,10 +1035,14 @@ async function main() {
         await rescanModels();
         await question(style('\n  Press Enter to continue...', 'dim'));
         break;
+      case '8':
+        await showInstallStatus();
+        await question(style('\n  Press Enter to continue...', 'dim'));
+        break;
       case '0':
         console.clear();
         printHeader();
-        printSuccess('Thank you for using TMC!');
+        printSuccess('Thank you for using ATM!');
         console.log('');
         rl.close();
         return;
