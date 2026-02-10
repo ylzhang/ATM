@@ -1,0 +1,5 @@
+# TMC Environment Variables
+# Generated at 2026-02-10T16:46:46.391Z
+export ANTHROPIC_BASE_URL="https://api.longcat.chat/anthropic"
+export ANTHROPIC_API_KEY="ak_2Fv10i6RF7Ti8TY7os52N3kZ2sF9T"
+export ANTHROPIC_MODEL="LongCat-Flash-Lite"

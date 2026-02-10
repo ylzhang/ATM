@@ -1,0 +1,10 @@
+{
+  "id": "env-anthropic-0",
+  "name": "Anthropic (qwen-flash-character)",
+  "provider": "Anthropic",
+  "url": "https://dashscope.aliyuncs.com/apps/anthropic",
+  "model": "qwen-flash-character",
+  "token": "sk-741105e1e82c458db93e8c889544487a",
+  "source": "environment",
+  "createdAt": "2026-02-10T16:45:02.565Z"
+}

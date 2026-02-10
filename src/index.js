@@ -16,7 +16,9 @@ const readline = require('readline');
 // ============================================
 const APP_NAME = 'ATM';
 const APP_FULL_NAME = 'AI Token Manager CLI';
-const CONFIG_DIR = path.join(os.homedir(), '.atm');
+
+// Use ATM_CONFIG_DIR env var for custom config location, default to ~/.atm
+const CONFIG_DIR = process.env.ATM_CONFIG_DIR || path.join(os.homedir(), '.atm');
 const MODELS_DIR = path.join(CONFIG_DIR, 'models');
 const CURRENT_FILE = path.join(CONFIG_DIR, 'current');
 const INDEX_FILE = path.join(CONFIG_DIR, 'models.json');
@@ -139,7 +141,7 @@ function printHeader() {
   console.log(style(UI.border.vertical + ' '.repeat((width - 2 - title.length) / 2) + title + ' '.repeat((width - 2 - title.length + 1) / 2) + UI.border.vertical, 'cyan', 'bright'));
   console.log(style(UI.border.vertical + ' '.repeat((width - 2 - subtitle.length) / 2) + style(subtitle, 'dim') + ' '.repeat((width - 2 - subtitle.length + 1) / 2) + UI.border.vertical, 'cyan'));
   console.log(style(UI.border.leftT + UI.border.horizontal.repeat(width - 2) + UI.border.rightT, 'cyan', 'dim'));
-  console.log(style(UI.border.vertical + `  ${icon('cloud')}  Platform: ${PLATFORM.padEnd(15)}  ${icon('database')}  Config: ~/.tmc`.padEnd(width - 2) + UI.border.vertical, 'white'));
+  console.log(style(UI.border.vertical + `  ${icon('cloud')}  Platform: ${PLATFORM.padEnd(15)}  ${icon('database')}  Config: ~/.atm`.padEnd(width - 2) + UI.border.vertical, 'white'));
   console.log(style(UI.border.bottomLeft + UI.border.horizontal.repeat(width - 2) + UI.border.bottomRight, 'cyan', 'dim'));
   console.log('');
 }
@@ -311,9 +313,12 @@ function markAsScanned() {
 }
 
 function scanLocalModels() {
+  // Ensure config directory exists first
+  ensureConfig();
+
   printSection('Scanning Local Environment');
   printInfo('Scanning for existing model configurations...');
-  
+
   const models = [];
   const homeDir = os.homedir();
   
@@ -346,22 +351,31 @@ function scanLocalModels() {
   
   if (uniqueModels.length > 0) {
     printSuccess(`Discovered ${uniqueModels.length} unique model(s)`);
-    
+
     // 一次性写入本地配置
     uniqueModels.forEach(model => {
       saveModel(model);
     });
-    
+
     // 更新索引
     const index = uniqueModels.map(m => ({ id: m.id, name: m.name }));
     saveModelIndex(index);
-    
+
     printSuccess('Models saved to local configuration');
+
+    // 自动设置第一个模型为当前模型，如果没有当前模型
+    if (!fs.existsSync(CURRENT_FILE) && uniqueModels.length > 0) {
+      updateCurrentFile(uniqueModels[0]);
+      printSuccess(`Auto-activated: ${uniqueModels[0].name}`);
+      printInfo(`Run the following command to apply:`);
+      console.log(getActivateCommand());
+    }
   } else {
     printWarning('No existing models found in local environment');
+    printInfo('You can manually add a model using option [2]');
   }
-  
-  // 标记已扫描
+
+  // 标记已扫描（始终创建此文件）
   markAsScanned();
   
   return uniqueModels;
@@ -369,44 +383,45 @@ function scanLocalModels() {
 
 function scanEnvironmentVariables() {
   const models = [];
-  
-  // 检查常见的环境变量
+
+  // Check common environment variables
   const envChecks = [
-    { 
+    {
       url: process.env.ANTHROPIC_BASE_URL,
-      token: process.env.ANTHROPIC_AUTH_TOKEN,
+      token: process.env.ANTHROPIC_API_KEY,
       model: process.env.ANTHROPIC_MODEL,
       provider: 'Anthropic'
     },
     {
-      url: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
+      url: process.env.OPENAI_API_BASE,
       token: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || 'gpt-4',
+      model: process.env.OPENAI_MODEL,
       provider: 'OpenAI'
     },
     {
-      url: process.env.MEITUAN_API_URL || 'https://api.longcat.chat/anthropic',
+      url: process.env.MEITUAN_API_URL,
       token: process.env.MEITUAN_API_KEY,
-      model: process.env.MEITUAN_MODEL || 'LongCat-Flash-Chat',
+      model: process.env.MEITUAN_MODEL,
       provider: 'Meituan'
     }
   ];
-  
+
   envChecks.forEach((env, idx) => {
-    if (env.token) {
+    // Check if any of the key env vars are set (url or model or token)
+    if (env.url || env.token || env.model) {
       models.push({
         id: `env-${env.provider.toLowerCase().replace(/\s+/g, '-')}-${idx}`,
-        name: `${env.provider} (${env.model})`,
+        name: `${env.provider} (${env.model || 'default'})`,
         provider: env.provider,
-        url: env.url,
-        model: env.model,
-        token: env.token,
+        url: env.url || '',
+        model: env.model || '',
+        token: env.token || '',
         source: 'environment',
         createdAt: new Date().toISOString()
       });
     }
   });
-  
+
   return models;
 }
 
@@ -464,7 +479,7 @@ function parseConfigContent(content, provider, filename) {
       if (line.includes('ANTHROPIC_BASE_URL=') || line.includes('API_URL=')) {
         url = line.split('=')[1]?.trim().replace(/["']/g, '');
       }
-      if (line.includes('ANTHROPIC_AUTH_TOKEN=') || line.includes('API_KEY=') || line.includes('TOKEN=')) {
+      if (line.includes('ANTHROPIC_API_KEY=') || line.includes('API_KEY=') || line.includes('TOKEN=')) {
         token = line.split('=')[1]?.trim().replace(/["']/g, '');
       }
       if (line.includes('ANTHROPIC_MODEL=') || line.includes('MODEL=')) {
@@ -533,14 +548,14 @@ function generateCurrentContent(model) {
     return `@echo off
 REM TMC Environment Variables
 set ANTHROPIC_BASE_URL=${winUrl}
-set ANTHROPIC_AUTH_TOKEN=${winToken}
+set ANTHROPIC_API_KEY=${winToken}
 set ANTHROPIC_MODEL=${winModel}
 `;
   } else {
     return `# TMC Environment Variables
 # Generated at ${new Date().toISOString()}
 export ANTHROPIC_BASE_URL="${url}"
-export ANTHROPIC_AUTH_TOKEN="${token}"
+export ANTHROPIC_API_KEY="${token}"
 export ANTHROPIC_MODEL="${modelName}"
 `;
   }
@@ -657,59 +672,155 @@ async function addModel() {
 
 async function switchModel() {
   printSection('Switch Active Model');
-  
+
   const index = loadModelIndex();
   if (index.length === 0) {
     printWarning('No models available');
     printInfo('Add a model first using option [2]');
     return;
   }
-  
-  printInfo('Select model to activate:');
+
+  printInfo('Use ↑/↓ arrow keys to navigate, Enter to select:');
   console.log('');
-  
-  index.forEach((item, i) => {
-    const model = loadModel(item.id);
-    if (model) {
-      const isActive = isModelActive(model.id);
-      const marker = isActive ? style('●', 'green') : style('○', 'dim');
-      console.log(`  ${marker} ${style(`${i + 1}.`, 'dim')} ${style(model.name, isActive ? 'green' : 'white')}`);
+
+  let selectedIdx = 0;
+  const models = index.map(item => loadModel(item.id)).filter(m => m);
+
+  // Find currently active model index
+  models.forEach((model, i) => {
+    if (isModelActive(model.id)) {
+      selectedIdx = i;
     }
   });
-  
-  console.log('');
-  const choice = await question(style('  Enter number: ', 'cyan'));
-  const idx = parseInt(choice) - 1;
-  
-  if (idx < 0 || idx >= index.length) {
-    printError('Invalid selection');
-    return;
-  }
-  
-  const selected = index[idx];
-  const model = loadModel(selected.id);
-  
-  if (!model) {
-    printError('Model configuration not found');
-    return;
-  }
-  
-  updateCurrentFile(model);
-  
-  console.log('');
-  printSuccess(`Activated: ${model.name}`);
-  printInfo(`Provider: ${model.provider}`);
-  printInfo(`Model: ${model.model}`);
-  
-  console.log('');
-  printSection('Activation Command');
-  console.log(getActivateCommand());
-  
-  if (!IS_WINDOWS) {
+
+  function renderList() {
+    // Move cursor up to redraw
+    process.stdout.write('\x1b[' + (models.length + 1) + 'A');
+
+    models.forEach((model, i) => {
+      const isActive = isModelActive(model.id);
+      const isSelected = i === selectedIdx;
+
+      let line = '  ';
+      if (isSelected) {
+        line += style('▶', 'cyan');
+      } else {
+        line += ' ';
+      }
+      line += ' ';
+
+      if (isActive) {
+        line += style('●', 'green');
+      } else {
+        line += style('○', 'dim');
+      }
+      line += ' ';
+
+      if (isSelected) {
+        line += style(model.name, 'cyan', 'bright');
+      } else if (isActive) {
+        line += style(model.name, 'green');
+      } else {
+        line += style(model.name, 'white');
+      }
+
+      // Clear line and print
+      process.stdout.write('\x1b[K' + line + '\n');
+    });
     console.log('');
-    printInfo('To make permanent, add to your shell profile:');
-    console.log(style(`  echo 'source ${CURRENT_FILE}' >> ${getShellConfigPath()}`, 'dim'));
   }
+
+  // Initial render
+  models.forEach((model, i) => {
+    const isActive = isModelActive(model.id);
+    const isSelected = i === selectedIdx;
+
+    let line = '  ';
+    if (isSelected) {
+      line += style('▶', 'cyan');
+    } else {
+      line += ' ';
+    }
+    line += ' ';
+
+    if (isActive) {
+      line += style('●', 'green');
+    } else {
+      line += style('○', 'dim');
+    }
+    line += ' ';
+
+    if (isSelected) {
+      line += style(model.name, 'cyan', 'bright');
+    } else if (isActive) {
+      line += style(model.name, 'green');
+    } else {
+      line += style(model.name, 'white');
+    }
+
+    console.log(line);
+  });
+  console.log('');
+
+  // Setup key handling
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+
+    function cleanup() {
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.removeAllListeners('data');
+    }
+
+    stdin.on('data', (key) => {
+      // Ctrl+C or q to quit
+      if (key === '\u0003' || key === 'q') {
+        cleanup();
+        console.log('');
+        printInfo('Selection cancelled');
+        resolve();
+        return;
+      }
+
+      // Enter to select
+      if (key === '\r' || key === '\n') {
+        cleanup();
+        const model = models[selectedIdx];
+
+        updateCurrentFile(model);
+
+        console.log('');
+        printSuccess(`Activated: ${model.name}`);
+        printInfo(`Provider: ${model.provider}`);
+        printInfo(`Model: ${model.model}`);
+
+        console.log('');
+        printSection('Activation Command');
+        console.log(getActivateCommand());
+
+        if (!IS_WINDOWS) {
+          console.log('');
+          printInfo('To make permanent, add to your shell profile:');
+          console.log(style(`  echo 'source ${CURRENT_FILE}' >> ${getShellConfigPath()}`, 'dim'));
+        }
+
+        resolve();
+        return;
+      }
+
+      // Arrow keys
+      if (key === '\u001b[A') { // Up
+        selectedIdx = (selectedIdx - 1 + models.length) % models.length;
+        renderList();
+      } else if (key === '\u001b[B') { // Down
+        selectedIdx = (selectedIdx + 1) % models.length;
+        renderList();
+      }
+    });
+  });
 }
 
 async function deleteModel() {
@@ -755,11 +866,11 @@ function showCurrent() {
   printSection('Current Environment');
   
   const hasBaseUrl = !!process.env.ANTHROPIC_BASE_URL;
-  const hasToken = !!process.env.ANTHROPIC_AUTH_TOKEN;
+  const hasToken = !!process.env.ANTHROPIC_API_KEY;
   const hasModel = !!process.env.ANTHROPIC_MODEL;
   
   console.log(`  ${hasBaseUrl ? style('✓', 'green') : style('✗', 'dim')} ANTHROPIC_BASE_URL: ${hasBaseUrl ? style(process.env.ANTHROPIC_BASE_URL, 'green') : style('not set', 'dim')}`);
-  console.log(`  ${hasToken ? style('✓', 'green') : style('✗', 'dim')} ANTHROPIC_AUTH_TOKEN: ${hasToken ? style('********', 'green') : style('not set', 'dim')}`);
+  console.log(`  ${hasToken ? style('✓', 'green') : style('✗', 'dim')} ANTHROPIC_API_KEY: ${hasToken ? style('********', 'green') : style('not set', 'dim')}`);
   console.log(`  ${hasModel ? style('✓', 'green') : style('✗', 'dim')} ANTHROPIC_MODEL: ${hasModel ? style(process.env.ANTHROPIC_MODEL, 'green') : style('not set', 'dim')}`);
   
   if (fs.existsSync(CURRENT_FILE)) {

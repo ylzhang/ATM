@@ -108,7 +108,7 @@ test('Generate Unix format current file', () => {
   const currentPath = path.join(TEST_DIR, 'current');
   const content = `# TMC Environment Variables
 export ANTHROPIC_BASE_URL="${testModel.url}"
-export ANTHROPIC_AUTH_TOKEN="${testModel.token}"
+export ANTHROPIC_API_KEY="${testModel.token}"
 export ANTHROPIC_MODEL="${testModel.model}"
 `;
   fs.writeFileSync(currentPath, content);
@@ -116,7 +116,7 @@ export ANTHROPIC_MODEL="${testModel.model}"
   
   const readContent = fs.readFileSync(currentPath, 'utf-8');
   assert(readContent.includes('export ANTHROPIC_BASE_URL='), 'Missing BASE_URL');
-  assert(readContent.includes('export ANTHROPIC_AUTH_TOKEN='), 'Missing AUTH_TOKEN');
+  assert(readContent.includes('export ANTHROPIC_API_KEY='), 'Missing AUTH_TOKEN');
   assert(readContent.includes('export ANTHROPIC_MODEL='), 'Missing MODEL');
 });
 
@@ -219,7 +219,7 @@ test('Generate Windows format current file', () => {
   const currentPath = path.join(TEST_DIR, 'current-windows');
   const content = `@echo off
 set ANTHROPIC_BASE_URL=${testModel.url}
-set ANTHROPIC_AUTH_TOKEN=${testModel.token}
+set ANTHROPIC_API_KEY=${testModel.token}
 set ANTHROPIC_MODEL=${testModel.model}
 `;
   fs.writeFileSync(currentPath, content);

@@ -1,0 +1,10 @@
+{
+  "id": "manual-1770741988757",
+  "name": "meituan",
+  "provider": "meituan",
+  "url": "https://api.longcat.chat/anthropic",
+  "model": "LongCat-Flash-Lite",
+  "token": "ak_2Fv10i6RF7Ti8TY7os52N3kZ2sF9T",
+  "source": "manual",
+  "createdAt": "2026-02-10T16:46:28.757Z"
+}
