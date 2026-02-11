@@ -22,12 +22,14 @@ ATM (AI Token Manager CLI) is a command-line tool designed for AI developers. It
 
 ```bash
 # Global installation
-npm install -g atm
+npm install -g @autoworld/atm
 
 # Or use npx
-npx atm
+npx @autoworld/atm
 
 # Or run from source
+git clone https://github.com/ylzhang/ATM.git
+cd ATM
 npm install
 npm start
 ```

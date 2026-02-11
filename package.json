@@ -1,5 +1,5 @@
 {
-  "name": "atm",
+  "name": "@autoworld/atm",
   "version": "1.0.0",
   "description": "ATM (AI Token Manager CLI) - A command-line tool for AI developers to centrally manage and quickly switch between multi-vendor AI Tokens and API URLs",
   "main": "src/index.js",
